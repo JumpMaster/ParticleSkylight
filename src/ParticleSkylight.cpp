@@ -1,22 +1,9 @@
-/******************************************************/
-//       THIS IS A GENERATED FILE - DO NOT EDIT       //
-/******************************************************/
-
-#line 1 "/home/kevin/Documents/GitHub/ParticleSkylight/src/ParticleSkylight.ino"
 #include "Particle.h"
 #include "mqtt.h"
 #include "papertrail.h"
 #include "secrets.h"
 
-void connectToMQTT();
-void selectExternalMeshAntenna();
-void powerLights(bool on);
-bool updateLeds();
-void setup();
-void loop();
-#line 6 "/home/kevin/Documents/GitHub/ParticleSkylight/src/ParticleSkylight.ino"
 typedef enum {
-  OFF,
   STATIC_COLOR,
   RAINBOW
 } MODES;
@@ -24,17 +11,21 @@ typedef enum {
 // Stubs
 void mqttCallback(char* topic, byte* payload, unsigned int length);
 void setMode(MODES newMode, char r, char g, char b);
+void powerLights(bool on);
 
-int cycle = 20;
+const char fadePauseTime = 20;
+const char transitionPauseTime = 5;
+char pauseTime = transitionPauseTime;
+
 unsigned long nextCycle;
 int stage = 0;
 bool isOn = false;
 
-MODES mode = OFF;
+MODES mode = RAINBOW;
 
 int ledPins[3] = {A0, A1, A2};
 char ledState[3];
-char requestedLedState[3];
+char requestedLedState[3] = {0, 0, 0};
 char savedLedState[3] = {255, 0, 0};
 
 uint32_t resetTime = 0;
@@ -68,6 +59,8 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
       a = strtok(NULL, ",");
       b = atoi(a);
       setMode(STATIC_COLOR, r, g, b);
+    } else if (strcmp(topic, "home/light/playroom/skylight/effect/set") == 0) {
+      setMode(RAINBOW, 0, 0, 0);
     }
 }
 
@@ -105,41 +98,42 @@ void selectExternalMeshAntenna() {
 }
 
 void setMode(MODES newMode, char r, char g, char b) {
-    
-  if (newMode == OFF) {
-    for (int i = 0; i < 3; i++) {
-      if (mode == 1)
-        savedLedState[i] = ledState[i];
-      requestedLedState[i] = 0;
-    }
-    isOn = false;
+  if (newMode == RAINBOW) {
+    requestedLedState[0] = 255;
+    requestedLedState[1] = 0;
+    requestedLedState[2] = 0;
+    stage = 0;
     mode = newMode;
-  } else if (newMode == RAINBOW) {
-    for (int i = 0; i < 3; i++)
-      requestedLedState[i] = savedLedState[i];
-    mode = newMode;
+    pauseTime = fadePauseTime;
+    if (mqttClient.isConnected())
+      mqttClient.publish("home/light/playroom/skylight/effect", "rainbow", true);
   } else if (newMode == STATIC_COLOR) {
-    if (mode == 1) {
-      for (int i = 0; i < 3; i++)
-        savedLedState[i] = ledState[i];
-    }
     requestedLedState[0] = r;
     requestedLedState[1] = g;
     requestedLedState[2] = b;
     mode = newMode;
+    pauseTime = transitionPauseTime;
+    if (mqttClient.isConnected())
+      mqttClient.publish("home/light/playroom/skylight/effect", "", true);
   }
 }
 
 void powerLights(bool on) {
   bool publishState = false;
   if (!isOn && on) {
-    setMode(RAINBOW, 0, 0, 0);
+    for (int i = 0; i < 3; i++)
+      requestedLedState[i] = savedLedState[i];
+
     publishState = true;
     isOn = true;
   } else if (isOn && !on) {
-    setMode(OFF, 0, 0, 0);
+    for (int i = 0; i < 3; i++) {
+      savedLedState[i] = requestedLedState[i];
+      requestedLedState[i] = 0;
+    }
     publishState = true;
     isOn = false;
+    pauseTime = transitionPauseTime;
   }
 
   if (publishState && mqttClient.isConnected())
@@ -160,7 +154,7 @@ bool updateLeds() {
             analogWrite(ledPins[i], ledState[i]);
         }
     }
-    
+
     return changesMade;
 }
 
@@ -171,10 +165,7 @@ void setup() {
   pinMode(A1, OUTPUT);
   pinMode(A2, OUTPUT);
 
-  // Particle.function("setState", setState);
-
   waitFor(Particle.connected, 30000);
-
 
   do {
       resetTime = Time.now();
@@ -205,10 +196,10 @@ void setup() {
 void loop() {
     
   if (millis() > nextCycle) {
-      
-    nextCycle = millis() + cycle;
-    
-    if (!updateLeds() && mode == RAINBOW) {
+
+    nextCycle = millis() + pauseTime;
+
+    if (!updateLeds() && isOn && mode == RAINBOW) {
       if (stage == 0) { // Red is up, bring up green
         requestedLedState[1] = 255;
       } else if (stage == 1) { // Red and green are up. take down red.
