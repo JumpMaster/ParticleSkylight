@@ -114,7 +114,7 @@ void setMode(MODES newMode, char r, char g, char b) {
     mode = newMode;
     pauseTime = transitionPauseTime;
     if (mqttClient.isConnected())
-      mqttClient.publish("home/light/playroom/skylight/effect", "", true);
+      mqttClient.publish("home/light/playroom/skylight/effect", "solid", true);
   }
 }
 
