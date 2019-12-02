@@ -55,6 +55,10 @@ void loadSettings() {
     savedLedState[0] = saveData.red;
     savedLedState[1] = saveData.green;
     savedLedState[2] = saveData.blue;
+    
+    brightness = savedBrightness;
+    for (int i; i < 3; i++)
+      requestedLedState[i] = savedLedState[i];
   }
 }
 
