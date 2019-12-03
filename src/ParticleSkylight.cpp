@@ -8,7 +8,7 @@
 void mqttCallback(char* topic, byte* payload, unsigned int length);
 void publishPowerState();
 void publishMode();
-void publishRGB();
+void publishColor();
 void publishBrightness();
 
 Light light;
@@ -32,19 +32,17 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     Log.info("%s - %s", topic, p);
     if (strcmp(topic, "home/light/playroom/skylight/switch/set") == 0) {
       bool publishState = false;
-      if (strcmp(p, "ON") == 0 && light.isOn()) {
+      if (strcmp(p, "ON") == 0 && !light.isOn()) {
         light.on();
         publishState = true;
-      } else if (strcmp(p, "OFF") == 0 && !light.isOn()) {
+      } else if (strcmp(p, "OFF") == 0 && light.isOn()) {
         light.off();
         publishState = true;
       }
 
       if (publishState && mqttClient.isConnected()) {
-        mqttClient.publish("home/light/playroom/skylight/switch", light.isOn() ? "ON" : "OFF", true);
-        char b[4];
-        sprintf(b, "%d", light.getBrightness());
-        mqttClient.publish("home/light/playroom/skylight/brightness", b, true);
+        publishPowerState();
+        publishBrightness();
       }
     } else if (strcmp(topic, "home/light/playroom/skylight/rgb/set") == 0) {
       int r, g, b = 0;
@@ -57,16 +55,20 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
       b = atoi(a);
       light.setColor(r, g, b);
       light.setMode(Light::STATIC);
+      publishMode();
+      publishColor();
     } else if (strcmp(topic, "home/light/playroom/skylight/effect/set") == 0) {
       if (strcmp(p, "static") == 0) {
         light.setMode(Light::STATIC);
       } else if (strcmp(p, "rainbow") == 0) {
         light.setMode(Light::RAINBOW);
       }
+      publishMode();
     } else if (strcmp(topic, "home/light/playroom/skylight/brightness/set") == 0) {
       char b = atoi(p);
       light.setBrightness(b);
       mqttClient.publish("home/light/playroom/skylight/brightness", p, true);
+      publishBrightness();
     }
 
     light.saveSettings();
@@ -82,7 +84,7 @@ void connectToMQTT() {
 
         publishPowerState();
         publishMode();
-        publishRGB();
+        publishColor();
         publishBrightness();
     } else {
         mqttConnectionAttempts++;
@@ -101,7 +103,7 @@ void publishMode() {
     mqttClient.publish("home/light/playroom/skylight/effect", "rainbow", true);
 }
 
-void publishRGB() {
+void publishColor() {
     char rgbString[12];
     uint32_t c = light.getColor();
     uint8_t
@@ -178,9 +180,9 @@ void loop() {
 
   light.loop();
 
-  if (light.getColorPublished() && millis() > nextRGBPublish) {
+  if (millis() > nextRGBPublish && !light.isColorPublished()) {
     nextRGBPublish = millis() + 500;
-    publishRGB();
+    publishColor();
   }
 
   if (mqttClient.isConnected()) {

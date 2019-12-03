@@ -36,16 +36,11 @@ void Light::setMode(MODES newMode) {
     stage = 0;
     mode = RAINBOW;
     pauseTime = fadePauseTime;
-    // if (mqttClient.isConnected())
-    //   mqttClient.publish("home/light/playroom/skylight/effect", "rainbow", true);
   } else if (newMode == STATIC) {
     for (int i = 0; i < 3; i++)
       requestedLedState[i] = savedLedState[i];
     mode = STATIC;
     pauseTime = transitionPauseTime;
-    // if (mqttClient.isConnected()) {
-    //   mqttClient.publish("home/light/playroom/skylight/effect", "static", true);
-    // }
   }
 }
 
@@ -69,7 +64,7 @@ bool Light::updateLeds() {
     }
   }
 
-  publishColor = changesMade ? true : publishColor;
+  colorPublished = changesMade ? false : colorPublished;
   return changesMade;
 }
 
@@ -99,12 +94,12 @@ void Light::saveSettings() {
     EEPROM.put(0, saveData);
 }
 
-bool Light::getColorPublished() {
-    if (publishColor) {
-        publishColor = false;
-        return true;
+bool Light::isColorPublished() {
+    if (!colorPublished) {
+        colorPublished = true;
+        return false;
     }
-    return false;
+    return true;
 }
 
 void Light::setBrightness(uint8_t b) {

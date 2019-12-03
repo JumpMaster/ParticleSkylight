@@ -20,7 +20,7 @@ public:
     void on();
     void off();
     bool isOn();
-    bool getColorPublished();
+    bool isColorPublished();
     void loadSettings();
     void saveSettings();
     void loop();
@@ -40,7 +40,7 @@ private:
     unsigned long nextCycle;
     int stage = 0;
     bool powerState = false;
-    bool publishColor = false;
+    bool colorPublished = false;
     MODES mode = RAINBOW;
 
     int ledPins[3] = {A0, A1, A2};
