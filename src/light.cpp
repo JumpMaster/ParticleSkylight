@@ -1,20 +1,20 @@
 #include "light.h"
 
 void Light::on() {
-    brightness = savedBrightness;
-    powerState = true;
+  brightness = savedBrightness;
+  powerState = true;
 }
 
 void Light::off() {
-    savedBrightness = brightness;
-    brightness = 0;
-    powerState = false;
-    pauseTime = transitionPauseTime;
+  savedBrightness = brightness;
+  brightness = 0;
+  powerState = false;
+  pauseTime = transitionPauseTime;
 }
 
 
 bool Light::isOn() {
-    return powerState;
+  return powerState;
 }
 
 void Light::setColor(uint8_t r, uint8_t g, uint8_t b) {
@@ -45,7 +45,7 @@ void Light::setMode(MODES newMode) {
 }
 
 Light::MODES Light::getMode() {
-    return mode;
+  return mode;
 }
 
 bool Light::updateLeds() {
@@ -85,30 +85,30 @@ void Light::loadSettings() {
 }
 
 void Light::saveSettings() {
-    SaveData saveData;
-    saveData.mode = mode;
-    saveData.brightness = savedBrightness;
-    saveData.red = savedLedState[0];
-    saveData.green = savedLedState[1];
-    saveData.blue = savedLedState[2];
-    EEPROM.put(0, saveData);
+  SaveData saveData;
+  saveData.mode = mode;
+  saveData.brightness = savedBrightness;
+  saveData.red = savedLedState[0];
+  saveData.green = savedLedState[1];
+  saveData.blue = savedLedState[2];
+  EEPROM.put(0, saveData);
 }
 
 bool Light::isColorPublished() {
-    if (!colorPublished) {
-        colorPublished = true;
-        return false;
-    }
-    return true;
+  if (!colorPublished) {
+    colorPublished = true;
+    return false;
+  }
+  return true;
 }
 
 void Light::setBrightness(uint8_t b) {
-    brightness = b;
-    savedBrightness = b;
+  brightness = b;
+  savedBrightness = b;
 }
 
 uint8_t Light::getBrightness() {
-    return brightness;
+  return brightness;
 }
 
 void Light::loop() {

@@ -25,71 +25,71 @@ const int mqttConnectAttemptTimeout2 = 30000;
 unsigned int mqttConnectionAttempts;
 
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
-    char p[length + 1];
-    memcpy(p, payload, length);
-    p[length] = '\0'; 
+  char p[length + 1];
+  memcpy(p, payload, length);
+  p[length] = '\0';
 
-    Log.info("%s - %s", topic, p);
-    if (strcmp(topic, "home/light/playroom/skylight/switch/set") == 0) {
-      bool publishState = false;
-      if (strcmp(p, "ON") == 0 && !light.isOn()) {
-        light.on();
-        publishState = true;
-      } else if (strcmp(p, "OFF") == 0 && light.isOn()) {
-        light.off();
-        publishState = true;
-      }
-
-      if (publishState && mqttClient.isConnected()) {
-        publishPowerState();
-        publishBrightness();
-      }
-    } else if (strcmp(topic, "home/light/playroom/skylight/rgb/set") == 0) {
-      int r, g, b = 0;
-      char *a;
-      a = strtok(p, ",");
-      r = atoi(a);
-      a = strtok(NULL, ",");
-      g = atoi(a);
-      a = strtok(NULL, ",");
-      b = atoi(a);
-      light.setColor(r, g, b);
-      light.setMode(Light::STATIC);
-      publishMode();
-      publishColor();
-    } else if (strcmp(topic, "home/light/playroom/skylight/effect/set") == 0) {
-      if (strcmp(p, "static") == 0) {
-        light.setMode(Light::STATIC);
-      } else if (strcmp(p, "rainbow") == 0) {
-        light.setMode(Light::RAINBOW);
-      }
-      publishMode();
-    } else if (strcmp(topic, "home/light/playroom/skylight/brightness/set") == 0) {
-      char b = atoi(p);
-      light.setBrightness(b);
-      mqttClient.publish("home/light/playroom/skylight/brightness", p, true);
-      publishBrightness();
+  Log.info("%s - %s", topic, p);
+  if (strcmp(topic, "home/light/playroom/skylight/switch/set") == 0) {
+    bool publishState = false;
+    if (strcmp(p, "ON") == 0 && !light.isOn()) {
+      light.on();
+      publishState = true;
+    } else if (strcmp(p, "OFF") == 0 && light.isOn()) {
+      light.off();
+      publishState = true;
     }
 
-    light.saveSettings();
+    if (publishState && mqttClient.isConnected()) {
+      publishPowerState();
+      publishBrightness();
+    }
+  } else if (strcmp(topic, "home/light/playroom/skylight/rgb/set") == 0) {
+    int r, g, b = 0;
+    char *a;
+    a = strtok(p, ",");
+    r = atoi(a);
+    a = strtok(NULL, ",");
+    g = atoi(a);
+    a = strtok(NULL, ",");
+    b = atoi(a);
+    light.setColor(r, g, b);
+    light.setMode(Light::STATIC);
+    publishMode();
+    publishColor();
+  } else if (strcmp(topic, "home/light/playroom/skylight/effect/set") == 0) {
+    if (strcmp(p, "static") == 0) {
+      light.setMode(Light::STATIC);
+    } else if (strcmp(p, "rainbow") == 0) {
+      light.setMode(Light::RAINBOW);
+    }
+    publishMode();
+  } else if (strcmp(topic, "home/light/playroom/skylight/brightness/set") == 0) {
+    char b = atoi(p);
+    light.setBrightness(b);
+    mqttClient.publish("home/light/playroom/skylight/brightness", p, true);
+    publishBrightness();
+  }
+
+  light.saveSettings();
 }
 
 void connectToMQTT() {
-    lastMqttConnectAttempt = millis();
-    bool mqttConnected = mqttClient.connect(System.deviceID(), mqttUsername, mqttPassword);
-    if (mqttConnected) {
-        mqttConnectionAttempts = 0;
-        Log.info("MQTT Connected");
-        mqttClient.subscribe("home/light/playroom/skylight/+/set");
+  lastMqttConnectAttempt = millis();
+  bool mqttConnected = mqttClient.connect(System.deviceID(), mqttUsername, mqttPassword);
+  if (mqttConnected) {
+    mqttConnectionAttempts = 0;
+    Log.info("MQTT Connected");
+    mqttClient.subscribe("home/light/playroom/skylight/+/set");
 
-        publishPowerState();
-        publishMode();
-        publishColor();
-        publishBrightness();
-    } else {
-        mqttConnectionAttempts++;
-        Log.info("MQTT failed to connect");
-    }
+    publishPowerState();
+    publishMode();
+    publishColor();
+    publishBrightness();
+  } else {
+    mqttConnectionAttempts++;
+    Log.info("MQTT failed to connect");
+  }
 }
 
 void publishPowerState() {
@@ -104,14 +104,14 @@ void publishMode() {
 }
 
 void publishColor() {
-    char rgbString[12];
-    uint32_t c = light.getColor();
-    uint8_t
-      r = (uint8_t)(c >> 16),
-      g = (uint8_t)(c >>  8),
-      b = (uint8_t)c;
-    sprintf(rgbString, "%d,%d,%d", r, g, b);
-    mqttClient.publish("home/light/playroom/skylight/rgb", rgbString, true);
+  char rgbString[12];
+  uint32_t c = light.getColor();
+  uint8_t
+    r = (uint8_t)(c >> 16),
+    g = (uint8_t)(c >>  8),
+    b = (uint8_t)c;
+  sprintf(rgbString, "%d,%d,%d", r, g, b);
+  mqttClient.publish("home/light/playroom/skylight/rgb", rgbString, true);
 }
 
 void publishBrightness() {
@@ -130,13 +130,13 @@ PapertrailLogHandler papertrailHandler(papertrailAddress, papertrailPort,
 
 void selectExternalMeshAntenna() {
 #if (PLATFORM_ID == PLATFORM_ARGON)
-    digitalWrite(ANTSW1, 1);
-    digitalWrite(ANTSW2, 0);
+  digitalWrite(ANTSW1, 1);
+  digitalWrite(ANTSW2, 0);
 #elif (PLATFORM_ID == PLATFORM_BORON)
-    digitalWrite(ANTSW1, 0);
+  digitalWrite(ANTSW1, 0);
 #else
-    digitalWrite(ANTSW1, 0);
-    digitalWrite(ANTSW2, 1);
+  digitalWrite(ANTSW1, 0);
+  digitalWrite(ANTSW2, 1);
 #endif
 }
 
@@ -151,8 +151,8 @@ void setup() {
   waitFor(Particle.connected, 30000);
 
   do {
-      resetTime = Time.now();
-      Particle.process();
+    resetTime = Time.now();
+    Particle.process();
   } while (resetTime < 1500000000 || millis() < 10000);
 
   if (System.resetReason() == RESET_REASON_PANIC) {
