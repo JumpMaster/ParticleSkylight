@@ -128,26 +128,13 @@ PapertrailLogHandler papertrailHandler(papertrailAddress, papertrailPort,
   // TOO MUCH!!! { “comm”, LOG_LEVEL_ALL }
 });
 
-void selectExternalMeshAntenna() {
-#if (PLATFORM_ID == PLATFORM_ARGON)
-  digitalWrite(ANTSW1, 1);
-  digitalWrite(ANTSW2, 0);
-#elif (PLATFORM_ID == PLATFORM_BORON)
-  digitalWrite(ANTSW1, 0);
-#else
-  digitalWrite(ANTSW1, 0);
-  digitalWrite(ANTSW2, 1);
-#endif
-}
-
-STARTUP(selectExternalMeshAntenna());
-
 void setup() {
   pinMode(A0, OUTPUT);
   pinMode(A1, OUTPUT);
   pinMode(A2, OUTPUT);
   light.loadSettings();
-
+  light.setup();
+  
   waitFor(Particle.connected, 30000);
 
   do {

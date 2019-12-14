@@ -2,6 +2,12 @@
 #define __LIGHT_H_
 
 #include "Particle.h"
+#include "FastLED.h"
+#define PARTICLE_NO_ARDUINO_COMPATIBILITY 1
+FASTLED_USING_NAMESPACE
+
+#define LED_COUNT 273
+#define LED_PIN D0
 
 class Light {
 
@@ -11,6 +17,7 @@ public:
     RAINBOW = 2
   } MODES;
   
+  void setup();
   void setMode(MODES newMode);
   MODES getMode();
   void setColor(uint8_t r, uint8_t g, uint8_t b);
@@ -33,7 +40,7 @@ private:
     uint8_t green;
     uint8_t blue;
   };
-
+  struct CRGB leds[LED_COUNT];
   const uint8_t fadePauseTime = 20;
   const uint8_t transitionPauseTime = 5;
   uint8_t pauseTime = fadePauseTime;
@@ -49,7 +56,7 @@ private:
   uint8_t savedLedState[3] = {255, 0, 0};
   uint8_t brightness = 0;
   uint8_t savedBrightness = 255;
-
+  uint8_t targetBrightness = 255;
   bool updateLeds();
 };
 #endif

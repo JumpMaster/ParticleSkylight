@@ -1,13 +1,18 @@
 #include "light.h"
 
+void Light::setup() {
+  FastLED.addLeds<WS2812, LED_PIN, GRB>(leds, LED_COUNT);
+  FastLED.show();
+}
+
 void Light::on() {
-  brightness = savedBrightness;
+  targetBrightness = savedBrightness;
   powerState = true;
 }
 
 void Light::off() {
   savedBrightness = brightness;
-  brightness = 0;
+  targetBrightness = 0;
   powerState = false;
   pauseTime = transitionPauseTime;
 }
@@ -50,18 +55,33 @@ Light::MODES Light::getMode() {
 
 bool Light::updateLeds() {
   bool changesMade = false;
-   
+
+  if (brightness != targetBrightness) {
+    changesMade = true;
+    if (targetBrightness > brightness)
+      brightness++;
+    else
+      brightness--;
+  }
+
   for (int i = 0; i < 3; i++) {
-    uint8_t adjustedState = (requestedLedState[i] * brightness) / 255;
-    if (ledState[i] != adjustedState) {
+    if (ledState[i] != requestedLedState[i]) {
       changesMade = true;
-      if (adjustedState > ledState[i])
+      if (requestedLedState[i] > ledState[i])
         ledState[i]++;
       else
         ledState[i]--;
-
-      analogWrite(ledPins[i], ledState[i]);
     }
+  }
+  
+  if (changesMade) {
+    FastLED.setBrightness(brightness);
+    for (int i = 0; i < LED_COUNT; i++) {
+      leds[i].red   = ledState[0];
+      leds[i].green = ledState[1];
+      leds[i].blue  = ledState[2];
+    }
+    FastLED.show();
   }
 
   colorPublished = changesMade ? false : colorPublished;
@@ -78,7 +98,7 @@ void Light::loadSettings() {
     savedLedState[1] = saveData.green;
     savedLedState[2] = saveData.blue;
     
-    brightness = savedBrightness;
+    targetBrightness = savedBrightness;
     for (int i = 0; i < 3; i++)
       requestedLedState[i] = savedLedState[i];
   }
@@ -87,7 +107,7 @@ void Light::loadSettings() {
 void Light::saveSettings() {
   SaveData saveData;
   saveData.mode = mode;
-  saveData.brightness = savedBrightness;
+  saveData.brightness = targetBrightness;
   saveData.red = savedLedState[0];
   saveData.green = savedLedState[1];
   saveData.blue = savedLedState[2];
@@ -103,12 +123,12 @@ bool Light::isColorPublished() {
 }
 
 void Light::setBrightness(uint8_t b) {
-  brightness = b;
+  targetBrightness = b;
   savedBrightness = b;
 }
 
 uint8_t Light::getBrightness() {
-  return brightness;
+  return targetBrightness;
 }
 
 void Light::loop() {
