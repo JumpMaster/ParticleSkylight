@@ -14,7 +14,8 @@ class Light {
 public:
   typedef enum { // Leave 0 undefined for loading test
     STATIC = 1,
-    RAINBOW = 2
+    RAINBOW = 2,
+    CHRISTMAS = 3
   } MODES;
   
   void setup();
@@ -36,27 +37,25 @@ private:
   struct SaveData {
     MODES mode;
     uint8_t brightness;
-    uint8_t red;
-    uint8_t green;
-    uint8_t blue;
+    CRGB color;
   };
   struct CRGB leds[LED_COUNT];
   const uint8_t fadePauseTime = 20;
   const uint8_t transitionPauseTime = 5;
   uint8_t pauseTime = fadePauseTime;
-  unsigned long nextCycle;
-  int stage = 0;
+  unsigned long nextLedCycle;
+  unsigned long nextBrightnessCycle;
+  int loop_count = 0;
   bool powerState = false;
   bool colorPublished = false;
   MODES mode = RAINBOW;
 
-  int ledPins[3] = {A0, A1, A2};
-  uint8_t ledState[3];
-  uint8_t requestedLedState[3] = {0, 0, 0};
-  uint8_t savedLedState[3] = {255, 0, 0};
+  CRGB ledState = CRGB::Black;
+  CRGB targetLedState = CRGB::Black;
+  CRGB savedLedState = CRGB::Red;
   uint8_t brightness = 0;
   uint8_t savedBrightness = 255;
-  uint8_t targetBrightness = 255;
+  uint8_t targetBrightness = 0;
   bool updateLeds();
 };
 #endif

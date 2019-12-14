@@ -2,6 +2,7 @@
 
 void Light::setup() {
   FastLED.addLeds<WS2812, LED_PIN, GRB>(leds, LED_COUNT);
+  FastLED.setBrightness(0);
   FastLED.show();
 }
 
@@ -11,39 +12,38 @@ void Light::on() {
 }
 
 void Light::off() {
-  savedBrightness = brightness;
+  savedBrightness = targetBrightness;
   targetBrightness = 0;
   powerState = false;
-  pauseTime = transitionPauseTime;
-}
 
+  // pauseTime = transitionPauseTime;
+}
 
 bool Light::isOn() {
   return powerState;
 }
 
 void Light::setColor(uint8_t r, uint8_t g, uint8_t b) {
-  savedLedState[0] = r;
-  savedLedState[1] = g;
-  savedLedState[2] = b;
+  savedLedState = CRGB(r, g, b);
 }
 
 uint32_t Light::getColor() {
-  uint32_t c = ((uint32_t)ledState[0] << 16) | ((uint32_t)ledState[1] <<  8) | (uint32_t)ledState[2];
+  uint32_t c = ((uint32_t)ledState.r << 16) | ((uint32_t)ledState.g <<  8) | (uint32_t)ledState.b;
   return c;
 }
 
 void Light::setMode(MODES newMode) {
   if (newMode == RAINBOW) {
-    requestedLedState[0] = 255;
-    requestedLedState[1] = 0;
-    requestedLedState[2] = 0;
-    stage = 0;
+    targetLedState = CRGB::Red;
+    loop_count = 0;
     mode = RAINBOW;
     pauseTime = fadePauseTime;
+  } else if (newMode == CHRISTMAS) {
+    loop_count = 0;
+    mode = CHRISTMAS;
+    pauseTime = 50;
   } else if (newMode == STATIC) {
-    for (int i = 0; i < 3; i++)
-      requestedLedState[i] = savedLedState[i];
+    targetLedState = savedLedState;
     mode = STATIC;
     pauseTime = transitionPauseTime;
   }
@@ -56,18 +56,10 @@ Light::MODES Light::getMode() {
 bool Light::updateLeds() {
   bool changesMade = false;
 
-  if (brightness != targetBrightness) {
-    changesMade = true;
-    if (targetBrightness > brightness)
-      brightness++;
-    else
-      brightness--;
-  }
-
   for (int i = 0; i < 3; i++) {
-    if (ledState[i] != requestedLedState[i]) {
+    if (ledState[i] != targetLedState[i]) {
       changesMade = true;
-      if (requestedLedState[i] > ledState[i])
+      if (targetLedState[i] > ledState[i])
         ledState[i]++;
       else
         ledState[i]--;
@@ -75,14 +67,13 @@ bool Light::updateLeds() {
   }
   
   if (changesMade) {
-    FastLED.setBrightness(brightness);
     for (int i = 0; i < LED_COUNT; i++) {
-      leds[i].red   = ledState[0];
-      leds[i].green = ledState[1];
-      leds[i].blue  = ledState[2];
+      leds[i] = ledState;
     }
-    FastLED.show();
   }
+
+  if (changesMade || brightness != targetBrightness)
+    FastLED.show();
 
   colorPublished = changesMade ? false : colorPublished;
   return changesMade;
@@ -94,23 +85,16 @@ void Light::loadSettings() {
   if (saveData.mode > 0) {
     mode = saveData.mode;
     savedBrightness = saveData.brightness;
-    savedLedState[0] = saveData.red;
-    savedLedState[1] = saveData.green;
-    savedLedState[2] = saveData.blue;
-    
-    targetBrightness = savedBrightness;
-    for (int i = 0; i < 3; i++)
-      requestedLedState[i] = savedLedState[i];
+    savedLedState = saveData.color;
+    targetLedState = saveData.color;
   }
 }
 
 void Light::saveSettings() {
   SaveData saveData;
   saveData.mode = mode;
-  saveData.brightness = targetBrightness;
-  saveData.red = savedLedState[0];
-  saveData.green = savedLedState[1];
-  saveData.blue = savedLedState[2];
+  saveData.brightness = savedBrightness;
+  saveData.color = savedLedState;
   EEPROM.put(0, saveData);
 }
 
@@ -132,34 +116,75 @@ uint8_t Light::getBrightness() {
 }
 
 void Light::loop() {
-  if (millis() > nextCycle) {
 
-    nextCycle = millis() + pauseTime;
+  if (millis() > nextBrightnessCycle) {
+    nextBrightnessCycle = millis() + 5;
 
-    if (powerState || (ledState[0]+ledState[1]+ledState[2]) > 0) {
-      int updated = updateLeds();
+    if (brightness != targetBrightness) {
+      if (targetBrightness > brightness)
+        brightness++;
+      else
+        brightness--;
 
-      if (mode == RAINBOW) {
+      FastLED.setBrightness(brightness);
+
+      if (brightness == 0) {
+        ledState = CRGB::Black;
+        FastLED.show();
+      }
+    }
+
+  }
+
+  if (millis() > nextLedCycle) {
+
+    nextLedCycle = millis() + pauseTime;
+
+    if (powerState || brightness > 0) {
+
+      if (mode == STATIC) {
+        updateLeds();
+      } else if (mode == RAINBOW) {
+        int updated = updateLeds();
+
         if (!updated) {
-          if (stage == 0) { // Red is up, bring up green
-            requestedLedState[1] = 255;
-          } else if (stage == 1) { // Red and green are up. take down red.
-            requestedLedState[0] = 0;
-          } else if (stage == 2) { // Green is up, bring up blue
-            requestedLedState[2] = 255;
-          } else if (stage == 3) { // Green and blue are up, take down green
-            requestedLedState[1] = 0;
-          } else if (stage == 4) { // Blue is up, bring up red
-            requestedLedState[0] = 255;
-          } else if (stage == 5) { // Blue and red are up, take down blue
-            requestedLedState[2] = 0;
+          if (loop_count == 0) { // Red is up, bring up green
+            targetLedState.g = 255;
+          } else if (loop_count == 1) { // Red and green are up. take down red.
+            targetLedState.r = 0;
+          } else if (loop_count == 2) { // Green is up, bring up blue
+            targetLedState.b = 255;
+          } else if (loop_count == 3) { // Green and blue are up, take down green
+            targetLedState.g = 0;
+          } else if (loop_count == 4) { // Blue is up, bring up red
+            targetLedState.r = 255;
+          } else if (loop_count == 5) { // Blue and red are up, take down blue
+            targetLedState.b = 0;
           }
 
-          if (stage == 5)
-            stage = 0;
+          if (loop_count == 5)
+            loop_count = 0;
           else
-            stage++;
+            loop_count++;
         }
+      } else if (mode == CHRISTMAS) {
+
+        if (loop_count >= 20)
+          loop_count = 0;
+        else
+          loop_count++;
+      
+        for (int i = 0; i < LED_COUNT; i++) {
+          uint8_t t = ((21+i-loop_count) / 7) % 3;
+          if (t == 0) {
+            leds[i] = CRGB::Red;
+          } else if (t == 1) {
+            leds[i] = CRGB::Green;
+          } else {
+            leds[i] = CRGB::Blue;
+          }
+        }
+        FastLED.show();
       }
     }
   }

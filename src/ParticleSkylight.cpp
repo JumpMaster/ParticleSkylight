@@ -58,11 +58,12 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     publishMode();
     publishColor();
   } else if (strcmp(topic, "home/light/playroom/skylight/effect/set") == 0) {
-    if (strcmp(p, "static") == 0) {
+    if (strcmp(p, "static") == 0)
       light.setMode(Light::STATIC);
-    } else if (strcmp(p, "rainbow") == 0) {
+    else if (strcmp(p, "rainbow") == 0)
       light.setMode(Light::RAINBOW);
-    }
+    else if (strcmp(p, "christmas") == 0)
+      light.setMode(Light::CHRISTMAS);
     publishMode();
   } else if (strcmp(topic, "home/light/playroom/skylight/brightness/set") == 0) {
     char b = atoi(p);
@@ -101,6 +102,8 @@ void publishMode() {
     mqttClient.publish("home/light/playroom/skylight/effect", "static", true);
   else if (light.getMode() == Light::RAINBOW)
     mqttClient.publish("home/light/playroom/skylight/effect", "rainbow", true);
+  else if (light.getMode() == Light::CHRISTMAS)
+    mqttClient.publish("home/light/playroom/skylight/effect", "christmas", true);
 }
 
 void publishColor() {
@@ -134,7 +137,7 @@ void setup() {
   pinMode(A2, OUTPUT);
   light.loadSettings();
   light.setup();
-  
+
   waitFor(Particle.connected, 30000);
 
   do {
