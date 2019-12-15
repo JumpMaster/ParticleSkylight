@@ -161,6 +161,7 @@ void setup() {
     resetCount = 0;
   }
 
+  Particle.publishVitals(900);
   Log.info("Boot complete. Reset count = %d", resetCount);
 
   connectToMQTT();

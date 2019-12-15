@@ -34,10 +34,9 @@ uint32_t Light::getColor() {
 
 void Light::setMode(MODES newMode) {
   if (newMode == RAINBOW) {
-    targetLedState = CRGB::Red;
     loop_count = 0;
     mode = RAINBOW;
-    pauseTime = fadePauseTime;
+    pauseTime = 8;
   } else if (newMode == CHRISTMAS) {
     loop_count = 0;
     mode = CHRISTMAS;
@@ -66,11 +65,8 @@ bool Light::updateLeds() {
     }
   }
   
-  if (changesMade) {
-    for (int i = 0; i < LED_COUNT; i++) {
-      leds[i] = ledState;
-    }
-  }
+  if (changesMade)
+    fill_solid(leds, LED_COUNT, ledState);
 
   if (changesMade || brightness != targetBrightness)
     FastLED.show();
@@ -145,28 +141,9 @@ void Light::loop() {
       if (mode == STATIC) {
         updateLeds();
       } else if (mode == RAINBOW) {
-        int updated = updateLeds();
-
-        if (!updated) {
-          if (loop_count == 0) { // Red is up, bring up green
-            targetLedState.g = 255;
-          } else if (loop_count == 1) { // Red and green are up. take down red.
-            targetLedState.r = 0;
-          } else if (loop_count == 2) { // Green is up, bring up blue
-            targetLedState.b = 255;
-          } else if (loop_count == 3) { // Green and blue are up, take down green
-            targetLedState.g = 0;
-          } else if (loop_count == 4) { // Blue is up, bring up red
-            targetLedState.r = 255;
-          } else if (loop_count == 5) { // Blue and red are up, take down blue
-            targetLedState.b = 0;
-          }
-
-          if (loop_count == 5)
-            loop_count = 0;
-          else
-            loop_count++;
-        }
+        loop_count--;
+        fill_rainbow( leds, LED_COUNT, loop_count, 2);
+        FastLED.show();
       } else if (mode == CHRISTMAS) {
 
         if (loop_count >= 20)

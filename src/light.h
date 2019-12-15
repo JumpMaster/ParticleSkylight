@@ -45,7 +45,7 @@ private:
   uint8_t pauseTime = fadePauseTime;
   unsigned long nextLedCycle;
   unsigned long nextBrightnessCycle;
-  int loop_count = 0;
+  uint8_t loop_count = 0;
   bool powerState = false;
   bool colorPublished = false;
   MODES mode = RAINBOW;
