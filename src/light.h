@@ -13,6 +13,7 @@ class Light {
 
 public:
   typedef enum { // Leave 0 undefined for loading test
+    NONE = 0,
     STATIC = 1,
     RAINBOW = 2,
     CHRISTMAS = 3
@@ -40,15 +41,13 @@ private:
     CRGB color;
   };
   struct CRGB leds[LED_COUNT];
-  const uint8_t fadePauseTime = 20;
-  const uint8_t transitionPauseTime = 5;
-  uint8_t pauseTime = fadePauseTime;
   unsigned long nextLedCycle;
   unsigned long nextBrightnessCycle;
   uint8_t loop_count = 0;
   bool powerState = false;
   bool colorPublished = false;
   MODES mode = RAINBOW;
+  MODES targetMode = NONE;
 
   CRGB ledState = CRGB::Black;
   CRGB targetLedState = CRGB::Black;
@@ -56,6 +55,6 @@ private:
   uint8_t brightness = 0;
   uint8_t savedBrightness = 255;
   uint8_t targetBrightness = 0;
-  bool updateLeds();
+  void updateLeds();
 };
 #endif

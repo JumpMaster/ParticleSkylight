@@ -12,7 +12,6 @@ void Light::on() {
 }
 
 void Light::off() {
-  savedBrightness = targetBrightness;
   targetBrightness = 0;
   powerState = false;
 
@@ -25,6 +24,7 @@ bool Light::isOn() {
 
 void Light::setColor(uint8_t r, uint8_t g, uint8_t b) {
   savedLedState = CRGB(r, g, b);
+  targetLedState = savedLedState;
 }
 
 uint32_t Light::getColor() {
@@ -33,46 +33,51 @@ uint32_t Light::getColor() {
 }
 
 void Light::setMode(MODES newMode) {
-  if (newMode == RAINBOW) {
-    loop_count = 0;
-    mode = RAINBOW;
-    pauseTime = 8;
-  } else if (newMode == CHRISTMAS) {
-    loop_count = 0;
-    mode = CHRISTMAS;
-    pauseTime = 50;
-  } else if (newMode == STATIC) {
+  if (newMode == RAINBOW && mode != RAINBOW) {
+    targetMode = RAINBOW;
+  } else if (newMode == CHRISTMAS && mode != CHRISTMAS) {
+    targetMode = CHRISTMAS;
+  } else if (newMode == STATIC && mode != STATIC) {
     targetLedState = savedLedState;
-    mode = STATIC;
-    pauseTime = transitionPauseTime;
-  }
+    ledState = targetLedState;
+    targetMode = STATIC;
+  } else
+    return;
+
+  targetBrightness = 0;
 }
 
 Light::MODES Light::getMode() {
+  if (targetMode != NONE)
+    return targetMode;
+
   return mode;
 }
 
-bool Light::updateLeds() {
+void Light::updateLeds() {
   bool changesMade = false;
 
   for (int i = 0; i < 3; i++) {
     if (ledState[i] != targetLedState[i]) {
       changesMade = true;
-      if (targetLedState[i] > ledState[i])
-        ledState[i]++;
-      else
-        ledState[i]--;
+      if (targetLedState[i] > ledState[i]) {
+        if ((targetLedState[i]-ledState[i]) > 5)
+          ledState[i] += 5;
+        else
+          ledState[i] = targetLedState[i];
+      } else {
+        if ((ledState[i]-targetLedState[i]) > 5)
+          ledState[i] -= 5;
+        else
+          ledState[i] = targetLedState[i];
+      }
     }
   }
   
-  if (changesMade)
+  if (changesMade || leds[0] != ledState)
     fill_solid(leds, LED_COUNT, ledState);
 
-  if (changesMade || brightness != targetBrightness)
-    FastLED.show();
-
   colorPublished = changesMade ? false : colorPublished;
-  return changesMade;
 }
 
 void Light::loadSettings() {
@@ -108,44 +113,54 @@ void Light::setBrightness(uint8_t b) {
 }
 
 uint8_t Light::getBrightness() {
-  return targetBrightness;
+  return savedBrightness;
 }
 
 void Light::loop() {
 
+  bool update = false;
+
   if (millis() > nextBrightnessCycle) {
-    nextBrightnessCycle = millis() + 5;
+    nextBrightnessCycle = millis() + 10;
 
     if (brightness != targetBrightness) {
       if (targetBrightness > brightness)
-        brightness++;
+        if ((targetBrightness - brightness) > 5)
+          brightness += 5;
+        else
+          brightness = targetBrightness;
       else
-        brightness--;
+        if ((brightness - targetBrightness) > 5)
+          brightness -= 5;
+        else
+          brightness = targetBrightness;
 
       FastLED.setBrightness(brightness);
 
-      if (brightness == 0) {
-        ledState = CRGB::Black;
-        FastLED.show();
+      if (brightness == 0 && targetMode != NONE) {
+        mode = targetMode;
+        targetMode = NONE;
+        loop_count = 0;
+        targetBrightness = savedBrightness;
       }
+      // }
     }
-
   }
 
   if (millis() > nextLedCycle) {
-
-    nextLedCycle = millis() + pauseTime;
+    update = true;
 
     if (powerState || brightness > 0) {
-
       if (mode == STATIC) {
+        nextLedCycle = millis() + 8;
         updateLeds();
       } else if (mode == RAINBOW) {
+        nextLedCycle = millis() + 8;
         loop_count--;
         fill_rainbow( leds, LED_COUNT, loop_count, 2);
-        FastLED.show();
+        update = true;
       } else if (mode == CHRISTMAS) {
-
+        nextLedCycle = millis() + 25;
         if (loop_count >= 20)
           loop_count = 0;
         else
@@ -161,8 +176,11 @@ void Light::loop() {
             leds[i] = CRGB::Blue;
           }
         }
-        FastLED.show();
+        update = true;
       }
     }
   }
+
+  if (update)
+    FastLED.show();
 }
