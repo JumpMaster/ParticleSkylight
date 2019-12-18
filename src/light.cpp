@@ -120,8 +120,8 @@ void Light::loop() {
 
   bool update = false;
 
-  if (millis() > nextBrightnessCycle) {
-    nextBrightnessCycle = millis() + 10;
+  if (System.ticks() > nextBrightnessCycle) {
+    nextBrightnessCycle = System.ticksPerMicrosecond() * 10000; //10 milliseconds
 
     if (brightness != targetBrightness) {
       if (targetBrightness > brightness)
@@ -143,29 +143,27 @@ void Light::loop() {
         loop_count = 0;
         targetBrightness = savedBrightness;
       }
-      // }
     }
   }
 
-  if (millis() > nextLedCycle) {
+  if (System.ticks() > nextLedCycle) {
     update = true;
 
     if (powerState || brightness > 0) {
       if (mode == STATIC) {
-        nextLedCycle = millis() + 8;
         updateLeds();
+        nextLedCycle = System.ticks() + (System.ticksPerMicrosecond() * 8000); // 8 milliseconds;
       } else if (mode == RAINBOW) {
-        nextLedCycle = millis() + 8;
         loop_count--;
         fill_rainbow( leds, LED_COUNT, loop_count, 2);
         update = true;
+        nextLedCycle = System.ticks() + (System.ticksPerMicrosecond() * 8000); // 8 milliseconds;
       } else if (mode == CHRISTMAS) {
-        nextLedCycle = millis() + 25;
         if (loop_count >= 20)
           loop_count = 0;
         else
           loop_count++;
-      
+
         for (int i = 0; i < LED_COUNT; i++) {
           uint8_t t = ((21+i-loop_count) / 7) % 3;
           if (t == 0) {
@@ -177,6 +175,7 @@ void Light::loop() {
           }
         }
         update = true;
+        nextLedCycle = System.ticks() + (System.ticksPerMicrosecond() * 25000); // 25 milliseconds;
       }
     }
   }
