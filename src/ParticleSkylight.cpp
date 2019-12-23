@@ -64,6 +64,8 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
       light.setMode(Light::RAINBOW);
     else if (strcmp(p, "christmas") == 0)
       light.setMode(Light::CHRISTMAS);
+    else if (strcmp(p, "meteors") == 0)
+      light.setMode(Light::METEORS);
     publishMode();
   } else if (strcmp(topic, "home/light/playroom/skylight/brightness/set") == 0) {
     char b = atoi(p);
@@ -104,6 +106,8 @@ void publishMode() {
     mqttClient.publish("home/light/playroom/skylight/effect", "rainbow", true);
   else if (light.getMode() == Light::CHRISTMAS)
     mqttClient.publish("home/light/playroom/skylight/effect", "christmas", true);
+  else if (light.getMode() == Light::METEORS)
+    mqttClient.publish("home/light/playroom/skylight/effect", "meteors", true);
 }
 
 void publishColor() {
@@ -123,6 +127,10 @@ void publishBrightness() {
   mqttClient.publish("home/light/playroom/skylight/brightness", b, true);
 }
 
+void random_seed_from_cloud(unsigned seed) {
+   srand(seed);
+}
+
 SYSTEM_THREAD(ENABLED);
 STARTUP(WiFi.selectAntenna(ANT_EXTERNAL)); // selects the u.FL antenna
 
@@ -140,6 +148,9 @@ void setup() {
   pinMode(A2, OUTPUT);
   light.loadSettings();
   light.setup();
+
+  Particle.variable("resetTime", resetTime);
+  Particle.publishVitals(900);
 
   waitFor(Particle.connected, 30000);
 
@@ -164,7 +175,6 @@ void setup() {
     resetCount = 0;
   }
 
-  Particle.publishVitals(900);
   Log.info("Boot complete. Reset count = %d", resetCount);
 
   connectToMQTT();

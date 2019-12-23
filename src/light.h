@@ -16,7 +16,8 @@ public:
     NONE = 0,
     STATIC = 1,
     RAINBOW = 2,
-    CHRISTMAS = 3
+    CHRISTMAS = 3,
+    METEORS = 4
   } MODES;
   
   void setup();
@@ -33,6 +34,7 @@ public:
   void loadSettings();
   void saveSettings();
   void loop();
+  CRGB randomBrightColor();
   
 private:
   struct SaveData {
@@ -40,12 +42,12 @@ private:
     uint8_t brightness;
     CRGB color;
   };
-  struct CRGB leds[LED_COUNT];
-  unsigned long nextLedCycle;
-  unsigned long nextBrightnessCycle;
+  CRGB leds[LED_COUNT];
+  uint32_t nextLedCycle;
   uint8_t loop_count = 0;
   bool powerState = false;
   bool colorPublished = false;
+  bool ledsUpdated = false;
   MODES mode = RAINBOW;
   MODES targetMode = NONE;
 
@@ -55,6 +57,14 @@ private:
   uint8_t brightness = 0;
   uint8_t savedBrightness = 255;
   uint8_t targetBrightness = 0;
+
+  CRGB meteorColor[2] = {CRGB::Blue, CRGB::Pink};
+  uint16_t meteorPosition[2] = {0, 0};
+  uint8_t meteorSpeed[2] = {1, 3};
   void updateLeds();
+  void changeModeTo(MODES newMode);
+  uint32_t nextPublishTime;
+  uint32_t lastPublishTime;
+  uint32_t fps;
 };
 #endif
