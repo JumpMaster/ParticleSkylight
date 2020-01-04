@@ -22,20 +22,38 @@ bool Light::isOn() {
   return powerState;
 }
 
-CRGB Light::randomBrightColor() {
-  CRGB rColor;
-  while (!rColor)
-    rColor = CRGB(rand() & 1 ? 255 : 0, rand() & 1 ? 255 : 0, rand() & 1 ? 255 : 0);
-  return rColor;
+CRGB Light::randomBrightColor(bool includeWhite) {
+  uint8_t color;
+  if (includeWhite)
+    color = random8(0, 7);
+  else
+    color = random8(0, 6);
+  
+  switch (color) {
+    case 0 :
+      return CRGB(0, 0, 255);
+    case 1 :
+      return CRGB(0, 255, 0);
+    case 2 :
+      return CRGB(255, 0, 0);
+    case 3 :
+      return CRGB(255, 255, 0);
+    case 4 :
+      return CRGB(0, 255,255);
+    case 5 :
+      return CRGB(255, 0, 255);
+  }
+
+  return CRGB::White;
 }
 
 void Light::setColor(uint8_t r, uint8_t g, uint8_t b) {
-  savedLedState = CRGB(r, g, b);
-  targetLedState = savedLedState;
+  savedColor = CRGB(r, g, b);
+  targetColor = savedColor;
 }
 
 uint32_t Light::getColor() {
-  uint32_t c = ((uint32_t)ledState.r << 16) | ((uint32_t)ledState.g <<  8) | (uint32_t)ledState.b;
+  uint32_t c = ((uint32_t)savedColor.r << 16) | ((uint32_t)savedColor.g <<  8) | (uint32_t)savedColor.b;
   return c;
 }
 
@@ -44,25 +62,24 @@ void Light::setMode(MODES newMode) {
     return;
   
   targetMode = newMode;
-  targetBrightness = 0;
 }
 
 void Light::changeModeTo(MODES newMode) {
   mode = newMode;
+  FastLED.clear();
   loop_count = 0;
-  if (newMode == METEORS && mode != METEORS) {
-    targetMode = METEORS;
-    // FastLED.clear();
-    // fill_solid(leds, LED_COUNT, CRGB::Black);
-    // FastLED.show();
-    meteorColor[0] = randomBrightColor();
-    meteorColor[1] = randomBrightColor();
+
+  if (newMode == METEORS) {
+    meteorColor[0] = randomBrightColor(true);
+    meteorColor[1] = randomBrightColor(true);
     meteorPosition[0] = 0;
     meteorPosition[1] = 0;
-  } else if (newMode == STATIC && mode != STATIC) {
-    targetLedState = savedLedState;
-    ledState = targetLedState;
+  } else if (newMode == STATIC) {
+    targetColor = savedColor;
     targetMode = STATIC;
+  } else if (newMode == LIGHT_SWIPE) {
+    targetColor = randomBrightColor(false);
+    previousColor = CRGB::Black;
   }
 }
 
@@ -77,18 +94,18 @@ void Light::updateLeds() {
   bool changesMade = false;
 
   for (int i = 0; i < 3; i++) {
-    if (ledState[i] != targetLedState[i]) {
+    if (leds[0][i] != targetColor[i]) {
       changesMade = true;
-      if (targetLedState[i] > ledState[i]) {
-        ledState[i] = targetLedState[i]-ledState[i] > 5 ? ledState[i]+5 : targetLedState[i];
+      if (targetColor[i] > leds[0][i]) {
+        leds[0][i] = targetColor[i]-leds[0][i] > 5 ? leds[0][i]+5 : targetColor[i];
       } else {
-        ledState[i] = ledState[i]-targetLedState[i] > 5 ? ledState[i]-5 : targetLedState[i];
+        leds[0][i] = leds[0][i]-targetColor[i] > 5 ? leds[0][i]-5 : targetColor[i];
       }
     }
   }
   
-  if (changesMade || leds[0] != ledState)
-    fill_solid(leds, LED_COUNT, ledState);
+  if (changesMade)// || leds[0] != leds)
+    fill_solid(leds, LED_COUNT, leds[0]);
 
   colorPublished = changesMade ? false : colorPublished;
 }
@@ -99,8 +116,8 @@ void Light::loadSettings() {
   if (saveData.mode > 0) {
     mode = saveData.mode;
     savedBrightness = saveData.brightness;
-    savedLedState = saveData.color;
-    targetLedState = saveData.color;
+    savedColor = saveData.color;
+    targetColor = saveData.color;
   }
 }
 
@@ -108,7 +125,7 @@ void Light::saveSettings() {
   SaveData saveData;
   saveData.mode = mode;
   saveData.brightness = savedBrightness;
-  saveData.color = savedLedState;
+  saveData.color = savedColor;
   EEPROM.put(0, saveData);
 }
 
@@ -132,27 +149,25 @@ uint8_t Light::getBrightness() {
 void Light::loop() {
 
   if (millis() >= nextLedCycle) {
-    nextLedCycle = millis() + 10; // roughly 100 fps
+    nextLedCycle = millis() + 5; // roughly 200 fps
 
-    if (brightness != targetBrightness) {
-      if (targetBrightness > brightness)
-        if ((targetBrightness - brightness) > 10)
-          brightness += 10;
-        else
-          brightness = targetBrightness;
-      else
-        if ((brightness - targetBrightness) > 10)
-          brightness -= 10;
-        else
-          brightness = targetBrightness;
-
-      FastLED.setBrightness(brightness);
-
+    if (targetMode) {
       if (brightness == 0 && targetMode != NONE) {
         changeModeTo(targetMode);
         targetMode = NONE;
-        targetBrightness = savedBrightness;
       }
+
+      brightness = brightness > 5 ? brightness-5 : 0;
+
+      FastLED.setBrightness(brightness);
+      ledsUpdated = true;
+    } else if (brightness != targetBrightness) {
+      if (targetBrightness > brightness)
+        brightness = targetBrightness - brightness > 5 ? brightness+5 : targetBrightness;
+      else
+        brightness = brightness - targetBrightness > 5 ? brightness-5 : targetBrightness;
+
+      FastLED.setBrightness(brightness);
       ledsUpdated = true;
     }
 
@@ -165,11 +180,11 @@ void Light::loop() {
         updateLeds();
       } else if (mode == RAINBOW) {
         loop_count--;
-        fill_rainbow( leds, LED_COUNT, loop_count, 2);
+        fill_rainbow( leds, LED_COUNT, loop_count/4, 2);
       } else if (mode == CHRISTMAS) {
-        if (loop_count % 2 == 0) {
+        if (loop_count % 3 == 0) {
           for (uint16_t i = 0; i < (LED_COUNT/2); i++) {
-            uint8_t t = ((loop_count/2) + i) / 7 % 3;
+            uint8_t t = ((loop_count/3) + i) / 7 % 3;
             CRGB color;
             if (t == 0) {
               color = CRGB::Red;
@@ -178,12 +193,6 @@ void Light::loop() {
             } else {
               color = CRGB::Blue;
             }
-
-            //int16_t l = 93-i;
-            //int16_t r = 94+i;
-
-            //if (l < 0)
-            //  l = LED_COUNT - (i-93);
 
             int16_t l = 231 + i;
             int16_t r = 229 - i;
@@ -197,7 +206,7 @@ void Light::loop() {
         }
         loop_count++;
 
-        if (loop_count >= 252) // 252 is divisible by 7 and 2
+        if (loop_count >= 63) // 63 is divisible by 7 and 3
           loop_count = 0;
 
       } else if (mode == METEORS) {
@@ -213,11 +222,37 @@ void Light::loop() {
 
           if (meteorPosition[m] >= LED_COUNT) {
             meteorPosition[m] = 0;
-            meteorColor[m] = randomBrightColor();
+            meteorColor[m] = randomBrightColor(true);
             meteorSpeed[m] = random8(1,3); // random number between 1 and 2
           }
         }
         loop_count++;
+      } else if (mode == LIGHT_SWIPE) {
+        leds[loop_count++] = CRGB::White;
+
+        for (int i = 0; i < LED_COUNT; i++) {
+          if (i < loop_count) {
+            if (leds[i].r > targetColor.r)
+              leds[i].r -= 5;
+            if (leds[i].g > targetColor.g)
+              leds[i].g -= 5;
+            if (leds[i].b > targetColor.b)
+              leds[i].b -= 5;
+          } else if (i > loop_count) {
+            if (leds[i].r > previousColor.r)
+              leds[i].r -= 5;
+            if (leds[i].g > previousColor.g)
+              leds[i].g -= 5;
+            if (leds[i].b > previousColor.b)
+              leds[i].b -= 5;
+          }
+        }
+
+        if (loop_count >= LED_COUNT) {
+          loop_count = 0;
+          previousColor = targetColor;
+          targetColor = randomBrightColor(false);
+        }
       }
     }
   }
@@ -225,16 +260,14 @@ void Light::loop() {
   if (ledsUpdated) {
     ledsUpdated = false;
     FastLED.show();
-    // fps++;
+    if (showFPS)
+      fps++;
   }
 
-  /*
-  if (millis() > nextPublishTime) {
+  if (showFPS && millis() > nextPublishTime) {
     Particle.publish("FPS", String::format("%d %d", millis()-lastPublishTime, fps), PRIVATE);
     lastPublishTime = nextPublishTime;
     nextPublishTime = millis() + 1000;
     fps = 0;
   }
-  */
-
 }

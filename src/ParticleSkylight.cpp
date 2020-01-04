@@ -24,6 +24,9 @@ const int mqttConnectAttemptTimeout1 = 5000;
 const int mqttConnectAttemptTimeout2 = 30000;
 unsigned int mqttConnectionAttempts;
 
+unsigned int udpLocalPort = 8888;
+UDP Udp;
+
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
   char p[length + 1];
   memcpy(p, payload, length);
@@ -66,6 +69,8 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
       light.setMode(Light::CHRISTMAS);
     else if (strcmp(p, "meteors") == 0)
       light.setMode(Light::METEORS);
+    else if (strcmp(p, "light_swipe") == 0)
+      light.setMode(Light::LIGHT_SWIPE);
     publishMode();
   } else if (strcmp(topic, "home/light/playroom/skylight/brightness/set") == 0) {
     char b = atoi(p);
@@ -108,6 +113,8 @@ void publishMode() {
     mqttClient.publish("home/light/playroom/skylight/effect", "christmas", true);
   else if (light.getMode() == Light::METEORS)
     mqttClient.publish("home/light/playroom/skylight/effect", "meteors", true);
+  else if (light.getMode() == Light::LIGHT_SWIPE)
+    mqttClient.publish("home/light/playroom/skylight/effect", "light_swipe", true);
 }
 
 void publishColor() {
@@ -175,6 +182,8 @@ void setup() {
     resetCount = 0;
   }
 
+  Udp.begin(udpLocalPort);
+
   Log.info("Boot complete. Reset count = %d", resetCount);
 
   connectToMQTT();
@@ -188,11 +197,25 @@ void loop() {
     nextRGBPublish = millis() + 500;
     publishColor();
   }
-
+  
   if (mqttClient.isConnected()) {
     mqttClient.loop();
   } else if ((mqttConnectionAttempts < 5 && millis() > (lastMqttConnectAttempt + mqttConnectAttemptTimeout1)) ||
               millis() > (lastMqttConnectAttempt + mqttConnectAttemptTimeout2)) {
     connectToMQTT();
   }
+
+  if (Udp.parsePacket() > 0) {
+
+    // Read first char of data received
+    char c = Udp.read();
+    // Ignore other chars
+    while(Udp.available())
+      Udp.read();
+    
+    uint8_t b = c - '0';
+    if (b >= 0 && b <= 9) {
+      light.setBrightness((b+1) * 25.5);
+    }
+  } 
 }
