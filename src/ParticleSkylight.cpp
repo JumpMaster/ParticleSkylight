@@ -71,6 +71,8 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
       light.setMode(Light::METEORS);
     else if (strcmp(p, "light_swipe") == 0)
       light.setMode(Light::LIGHT_SWIPE);
+    else if (strcmp(p, "bounce") == 0)
+      light.setMode(Light::BOUNCE);
     publishMode();
   } else if (strcmp(topic, "home/light/playroom/skylight/brightness/set") == 0) {
     char b = atoi(p);
@@ -115,6 +117,8 @@ void publishMode() {
     mqttClient.publish("home/light/playroom/skylight/effect", "meteors", true);
   else if (light.getMode() == Light::LIGHT_SWIPE)
     mqttClient.publish("home/light/playroom/skylight/effect", "light_swipe", true);
+  else if (light.getMode() == Light::BOUNCE)
+    mqttClient.publish("home/light/playroom/skylight/effect", "bounce", true);
 }
 
 void publishColor() {

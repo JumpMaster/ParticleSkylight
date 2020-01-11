@@ -8,6 +8,8 @@ FASTLED_USING_NAMESPACE
 
 #define LED_COUNT 273
 #define LED_PIN D0
+#define BOUNCE_ARRAY_SIZE 5
+#define BOUNCE_LENGTH 5
 
 class Light {
 
@@ -18,9 +20,10 @@ public:
     RAINBOW = 2,
     CHRISTMAS = 3,
     METEORS = 4,
-    LIGHT_SWIPE = 5
+    LIGHT_SWIPE = 5,
+    BOUNCE = 6,
   } MODES;
-  
+  bool showFPS = false;
   void setup();
   void setMode(MODES newMode);
   MODES getMode();
@@ -43,6 +46,14 @@ private:
     uint8_t brightness;
     CRGB color;
   };
+  struct BounceData {
+    bool enabled = false;
+    bool fadeOut = false;
+    bool direction = true;
+    uint8_t speed = 20;
+    uint16_t position[5];
+    CRGB color = CRGB::White;
+  };
   CRGB leds[LED_COUNT];
   uint32_t nextLedCycle;
   uint16_t loop_count = 0;
@@ -64,11 +75,14 @@ private:
   uint16_t meteorPosition[2] = {0, 0};
   uint8_t meteorSpeed[2] = {1, 2};
   void updateLeds();
+  void addColorToLed(uint16_t p, CRGB c);
 
   void changeModeTo(MODES newMode);
   uint32_t nextPublishTime;
   uint32_t lastPublishTime;
   uint32_t fps;
-  bool showFPS = false;
+
+  BounceData bounces[BOUNCE_ARRAY_SIZE];
+  uint32_t nextBounceRelease;
 };
 #endif

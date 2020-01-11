@@ -80,6 +80,46 @@ void Light::changeModeTo(MODES newMode) {
   } else if (newMode == LIGHT_SWIPE) {
     targetColor = randomBrightColor(false);
     previousColor = CRGB::Black;
+  } else if (newMode == BOUNCE) {
+    
+    // bounces[0].enabled = true;
+    // bounces[0].direction = random8(0, 2);
+    // bounces[0].speed = 20;
+    // lastBounceRelease = millis();
+
+    for (int i = 1; i < BOUNCE_ARRAY_SIZE; i++)
+      bounces[i].enabled = false;
+    /*
+    bounces[0].enabled = true;
+    bounces[0].position[0] = 0;
+    bounces[0].direction = true;
+    bounces[0].color = CRGB::Blue;
+    bounces[0].speed = 4;
+
+    bounces[1].enabled = true;
+    bounces[1].position[0] = 0;
+    bounces[1].direction = true;
+    bounces[1].color = CRGB::Yellow;
+    bounces[1].speed = 10;
+
+    bounces[2].enabled = true;
+    bounces[2].position[0] = LED_COUNT-1;
+    bounces[2].direction = false;
+    bounces[2].color = CRGB::Green;
+    bounces[2].speed = 2;
+
+    bounces[3].enabled = true;
+    bounces[3].position[0] = LED_COUNT-1;
+    bounces[3].direction = false;
+    bounces[3].color = CRGB::Green;
+    bounces[3].speed = 3;
+
+    bounces[4].enabled = true;
+    bounces[4].position[0] = 0;
+    bounces[4].direction = true;
+    bounces[4].color = CRGB::Magenta;
+    bounces[4].speed = 10;
+*/
   }
 }
 
@@ -108,6 +148,12 @@ void Light::updateLeds() {
     fill_solid(leds, LED_COUNT, leds[0]);
 
   colorPublished = changesMade ? false : colorPublished;
+}
+
+void Light::addColorToLed(uint16_t p, CRGB c) {
+  leds[p].r = qadd8(c.r, leds[p].r);
+  leds[p].g = qadd8(c.g, leds[p].g);
+  leds[p].b = qadd8(c.b, leds[p].b);  
 }
 
 void Light::loadSettings() {
@@ -147,9 +193,10 @@ uint8_t Light::getBrightness() {
 }
 
 void Light::loop() {
+  uint32_t currentTime = millis();
 
-  if (millis() >= nextLedCycle) {
-    nextLedCycle = millis() + 5; // roughly 200 fps
+  if (currentTime >= nextLedCycle) {
+    nextLedCycle = currentTime + 5; // roughly 200 fps
 
     if (targetMode) {
       if (brightness == 0 && targetMode != NONE) {
@@ -214,9 +261,7 @@ void Light::loop() {
 
         for (uint8_t m = 0; m <= 1; m++) {
           if (loop_count % meteorSpeed[m] == 0) {
-            leds[meteorPosition[m]].r = qadd8(meteorColor[m].r, leds[meteorPosition[m]].r);
-            leds[meteorPosition[m]].g = qadd8(meteorColor[m].g, leds[meteorPosition[m]].g);
-            leds[meteorPosition[m]].b = qadd8(meteorColor[m].b, leds[meteorPosition[m]].b);
+            addColorToLed(meteorPosition[m], meteorColor[m]);
             meteorPosition[m]++;
           }
 
@@ -253,6 +298,166 @@ void Light::loop() {
           previousColor = targetColor;
           targetColor = randomBrightColor(false);
         }
+      } else if (mode == BOUNCE) {
+        FastLED.clear();
+
+        // Update bounces
+        for (int i = 0; i < BOUNCE_ARRAY_SIZE; i++) {
+          if (!bounces[i].enabled)
+            continue;
+
+          if (loop_count % bounces[i].speed != 0) {
+            for (int8_t a = BOUNCE_LENGTH-1; a > 0; a--) {
+              bounces[i].position[a] = bounces[i].position[a-1];
+            }
+          
+            if (bounces[i].direction) {
+              bounces[i].position[0] = bounces[i].position[1] + 1;
+            } else {
+              bounces[i].position[0] = bounces[i].position[1] - 1;
+            }
+
+            if (bounces[i].position[0] >= LED_COUNT) {
+              if (bounces[i].direction)
+                bounces[i].position[0] = 0;
+              else
+                bounces[i].position[0] = LED_COUNT-1;
+            }
+          }
+        }
+
+        // Draw Bounces
+        for (int i = 0; i < BOUNCE_ARRAY_SIZE; i++) {
+          if (!bounces[i].enabled)
+            continue;
+          
+          for (int a = 0; a < BOUNCE_LENGTH; a++) {
+            if (bounces[i].position[a] < LED_COUNT-1)
+              leds[bounces[i].position[a]] = bounces[i].color;
+          }
+        }
+
+        //
+        // Detect collisions
+        //
+        // Face-on-collisions
+        for (uint8_t i = 0; i < BOUNCE_ARRAY_SIZE; i++) {
+          if (!bounces[i].enabled)
+            continue;
+
+          uint16_t collision = bounces[i].direction ? bounces[i].position[0]+1 : bounces[i].position[0]-1;
+
+          if (collision >= LED_COUNT)
+            collision = bounces[i].direction ? 0 : LED_COUNT-1;
+   
+          for (uint8_t a = i+1; a < BOUNCE_ARRAY_SIZE; a++) {
+            if (!bounces[a].enabled ||
+                bounces[i].direction == bounces[a].direction)
+              continue;
+            
+            if (bounces[a].position[0] == collision || bounces[i].position[0] == bounces[a].position[0]) {
+              if (bounces[i].speed == 2)
+                bounces[i].fadeOut = true;
+              else
+                bounces[i].speed--;
+
+              if (bounces[a].speed == 2)
+                bounces[a].fadeOut = true;
+              else
+                bounces[a].speed--;
+
+              bounces[i].direction = !bounces[i].direction;
+              bounces[a].direction = !bounces[a].direction;
+            }
+          }
+        }
+
+
+        // Rear collisions
+        for (int i = 0; i < BOUNCE_ARRAY_SIZE; i++) {
+          if (!bounces[i].enabled)
+            continue;
+
+          uint16_t collision = bounces[i].direction ? bounces[i].position[0]+1 : bounces[i].position[0]-1;
+          
+          if (collision >= LED_COUNT)
+            collision = bounces[i].direction ? 0 : LED_COUNT-1;
+
+          for (int a = 0; a < BOUNCE_ARRAY_SIZE; a++) {
+            if (a == i ||
+                !bounces[a].enabled ||
+                bounces[i].direction != bounces[a].direction ||
+                bounces[i].speed <= bounces[a].speed)
+              continue;
+
+            if (bounces[a].position[BOUNCE_LENGTH-1] == collision || bounces[a].position[BOUNCE_LENGTH-1] == bounces[i].position[0]) {
+              uint8_t i_speed = 2;
+
+              if (bounces[i].speed == 2)
+                bounces[a].fadeOut = true;
+              else
+                i_speed = bounces[i].speed--;
+
+              if (bounces[a].speed == 2)
+                bounces[i].fadeOut = true;
+              else
+                bounces[i].speed = bounces[a].speed--;
+
+              bounces[a].speed = i_speed;
+            }
+          }
+        }
+
+        // Deal with stopped bounces
+        for (int i = 0; i < BOUNCE_ARRAY_SIZE; i++) {
+          if (bounces[i].fadeOut) {
+            // if (loop_count % 2 == 0)
+              bounces[i].color.fadeToBlackBy(2);
+
+            if (!bounces[i].color)
+              bounces[i].enabled = false;
+          }
+        }
+
+        // Deal with disabled bounces
+        if (currentTime >= nextBounceRelease) {
+          for (int i = 0; i < BOUNCE_ARRAY_SIZE; i++) {
+            if (!bounces[i].enabled) {
+              // Survey visible bounces for direction
+              uint8_t forwards = 0;
+              uint8_t backwards = 0;
+              for (uint8_t a = 0; a < BOUNCE_ARRAY_SIZE; a++) {
+                if (bounces[a].enabled) {
+                  if (bounces[a].direction)
+                    forwards++;
+                  else
+                    backwards++;
+                }
+              }
+
+              nextBounceRelease = currentTime + 2000UL;
+              bounces[i].enabled = true;
+              bounces[i].fadeOut = false;
+
+              if (forwards == 0)
+                bounces[i].direction = true;
+              else if (backwards == 0)
+                bounces[i].direction = false;
+              else
+                bounces[i].direction = random8(0, 2);
+
+              bounces[i].position[0] = bounces[i].direction ? 0 : LED_COUNT-1;
+              for (uint8_t a = 1; a < BOUNCE_LENGTH; a++)
+                bounces[i].position[a] = bounces[i].position[0];
+
+              bounces[i].color = randomBrightColor(true);
+              bounces[i].speed = 20;
+              break;
+            }
+          }
+        }
+
+        loop_count++;
       }
     }
   }
@@ -264,10 +469,10 @@ void Light::loop() {
       fps++;
   }
 
-  if (showFPS && millis() > nextPublishTime) {
-    Particle.publish("FPS", String::format("%d %d", millis()-lastPublishTime, fps), PRIVATE);
+  if (showFPS && currentTime > nextPublishTime) {
+    Particle.publish("FPS", String::format("%d %d", currentTime-lastPublishTime, fps), PRIVATE);
     lastPublishTime = nextPublishTime;
-    nextPublishTime = millis() + 1000;
+    nextPublishTime = currentTime + 1000;
     fps = 0;
   }
 }
