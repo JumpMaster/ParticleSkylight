@@ -59,7 +59,6 @@ private:
   uint16_t loop_count = 0;
   bool powerState = false;
   bool colorPublished = false;
-  bool ledsUpdated = false;
   MODES mode = RAINBOW;
   MODES targetMode = NONE;
 
@@ -79,10 +78,12 @@ private:
 
   void changeModeTo(MODES newMode);
   uint32_t nextPublishTime;
-  uint32_t lastPublishTime;
-  uint32_t fps;
+  uint32_t lastRuntime;
+  uint32_t lastLedShow;
+  uint16_t fps;
 
   BounceData bounces[BOUNCE_ARRAY_SIZE];
   uint32_t nextBounceRelease;
+  bool lightsOn = false;
 };
 #endif

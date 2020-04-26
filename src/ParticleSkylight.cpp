@@ -146,7 +146,7 @@ SYSTEM_THREAD(ENABLED);
 STARTUP(WiFi.selectAntenna(ANT_EXTERNAL)); // selects the u.FL antenna
 
 PapertrailLogHandler papertrailHandler(papertrailAddress, papertrailPort,
-  "ArgonTexecom", System.deviceID(),
+  "ParticleSkylight", System.deviceID(),
   LOG_LEVEL_NONE, {
   { "app", LOG_LEVEL_ALL }
   // TOO MUCH!!! { “system”, LOG_LEVEL_ALL },

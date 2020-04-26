@@ -81,45 +81,9 @@ void Light::changeModeTo(MODES newMode) {
     targetColor = randomBrightColor(false);
     previousColor = CRGB::Black;
   } else if (newMode == BOUNCE) {
-    
-    // bounces[0].enabled = true;
-    // bounces[0].direction = random8(0, 2);
-    // bounces[0].speed = 20;
-    // lastBounceRelease = millis();
-
-    for (int i = 1; i < BOUNCE_ARRAY_SIZE; i++)
+    for (int i = 1; i < BOUNCE_ARRAY_SIZE; i++) {
       bounces[i].enabled = false;
-    /*
-    bounces[0].enabled = true;
-    bounces[0].position[0] = 0;
-    bounces[0].direction = true;
-    bounces[0].color = CRGB::Blue;
-    bounces[0].speed = 4;
-
-    bounces[1].enabled = true;
-    bounces[1].position[0] = 0;
-    bounces[1].direction = true;
-    bounces[1].color = CRGB::Yellow;
-    bounces[1].speed = 10;
-
-    bounces[2].enabled = true;
-    bounces[2].position[0] = LED_COUNT-1;
-    bounces[2].direction = false;
-    bounces[2].color = CRGB::Green;
-    bounces[2].speed = 2;
-
-    bounces[3].enabled = true;
-    bounces[3].position[0] = LED_COUNT-1;
-    bounces[3].direction = false;
-    bounces[3].color = CRGB::Green;
-    bounces[3].speed = 3;
-
-    bounces[4].enabled = true;
-    bounces[4].position[0] = 0;
-    bounces[4].direction = true;
-    bounces[4].color = CRGB::Magenta;
-    bounces[4].speed = 10;
-*/
+    }
   }
 }
 
@@ -193,10 +157,11 @@ uint8_t Light::getBrightness() {
 }
 
 void Light::loop() {
-  uint32_t currentTime = millis();
+  uint32_t tick_time = System.ticks() / System.ticksPerMicrosecond();//) - lastRuntime;
 
-  if (currentTime >= nextLedCycle) {
-    nextLedCycle = currentTime + 5; // roughly 200 fps
+
+  if (tick_time - lastRuntime >= 10000) {
+    lastRuntime = tick_time;
 
     if (targetMode) {
       if (brightness == 0 && targetMode != NONE) {
@@ -207,7 +172,6 @@ void Light::loop() {
       brightness = brightness > 5 ? brightness-5 : 0;
 
       FastLED.setBrightness(brightness);
-      ledsUpdated = true;
     } else if (brightness != targetBrightness) {
       if (targetBrightness > brightness)
         brightness = targetBrightness - brightness > 5 ? brightness+5 : targetBrightness;
@@ -215,14 +179,12 @@ void Light::loop() {
         brightness = brightness - targetBrightness > 5 ? brightness-5 : targetBrightness;
 
       FastLED.setBrightness(brightness);
-      ledsUpdated = true;
     }
 
   
     // We need to continue all animations until
     // we're powered off and the brightness is 0
     if (powerState || brightness > 0) {
-      ledsUpdated = true;
       if (mode == STATIC) {
         updateLeds();
       } else if (mode == RAINBOW) {
@@ -411,7 +373,7 @@ void Light::loop() {
         // Deal with stopped bounces
         for (int i = 0; i < BOUNCE_ARRAY_SIZE; i++) {
           if (bounces[i].fadeOut) {
-            // if (loop_count % 2 == 0)
+
               bounces[i].color.fadeToBlackBy(2);
 
             if (!bounces[i].color)
@@ -420,7 +382,7 @@ void Light::loop() {
         }
 
         // Deal with disabled bounces
-        if (currentTime >= nextBounceRelease) {
+        if (Time.now() >= nextBounceRelease) {
           for (int i = 0; i < BOUNCE_ARRAY_SIZE; i++) {
             if (!bounces[i].enabled) {
               // Survey visible bounces for direction
@@ -435,7 +397,7 @@ void Light::loop() {
                 }
               }
 
-              nextBounceRelease = currentTime + 2000UL;
+              nextBounceRelease = Time.now() + 2;
               bounces[i].enabled = true;
               bounces[i].fadeOut = false;
 
@@ -456,23 +418,27 @@ void Light::loop() {
             }
           }
         }
-
         loop_count++;
       }
     }
   }
 
-  if (ledsUpdated) {
-    ledsUpdated = false;
+  // 20000 == Roughly 60 FPS
+  if ((brightness || lightsOn) && tick_time - lastLedShow >= 20000) {
+    if (brightness == 0)
+      lightsOn = false;
+    else if (!lightsOn)
+      lightsOn = true;
+    lastLedShow = tick_time;
     FastLED.show();
     if (showFPS)
       fps++;
   }
 
-  if (showFPS && currentTime > nextPublishTime) {
-    Particle.publish("FPS", String::format("%d %d", currentTime-lastPublishTime, fps), PRIVATE);
-    lastPublishTime = nextPublishTime;
-    nextPublishTime = currentTime + 1000;
+
+  if (showFPS && Time.now() > nextPublishTime) {
+    Particle.publish("FPS", String::format("%d %d", Time.now(), fps / 10), PRIVATE);
+    nextPublishTime = Time.now() + 10;
     fps = 0;
   }
 }
