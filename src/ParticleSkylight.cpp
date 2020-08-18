@@ -3,6 +3,7 @@
 #include "papertrail.h"
 #include "secrets.h"
 #include "light.h"
+#include "DiagnosticsHelperRK.h"
 
 // Stubs
 void mqttCallback(char* topic, byte* payload, unsigned int length);
@@ -91,7 +92,6 @@ void connectToMQTT() {
     mqttConnectionAttempts = 0;
     Log.info("MQTT Connected");
     mqttClient.subscribe("home/light/playroom/skylight/+/set");
-
     publishPowerState();
     publishMode();
     publishColor();
@@ -100,6 +100,24 @@ void connectToMQTT() {
     mqttConnectionAttempts++;
     Log.info("MQTT failed to connect");
   }
+}
+
+uint32_t nextMetricsUpdate = 0;
+void sendTelegrafMetrics() {
+    if (millis() > nextMetricsUpdate) {
+        nextMetricsUpdate = millis() + 30000;
+
+        char buffer[150];
+        snprintf(buffer, sizeof(buffer),
+            "status,device=Skylight uptime=%d,resetReason=%d,firmware=\"%s\",memTotal=%ld,memFree=%ld",
+            System.uptime(),
+            System.resetReason(),
+            System.version().c_str(),
+            DiagnosticsHelper::getValue(DIAG_ID_SYSTEM_TOTAL_RAM),
+            DiagnosticsHelper::getValue(DIAG_ID_SYSTEM_USED_RAM)
+            );
+        mqttClient.publish("telegraf/particle", buffer);
+    }
 }
 
 void publishPowerState() {
@@ -142,9 +160,6 @@ void random_seed_from_cloud(unsigned seed) {
    srand(seed);
 }
 
-SYSTEM_THREAD(ENABLED);
-STARTUP(WiFi.selectAntenna(ANT_EXTERNAL)); // selects the u.FL antenna
-
 PapertrailLogHandler papertrailHandler(papertrailAddress, papertrailPort,
   "ParticleSkylight", System.deviceID(),
   LOG_LEVEL_NONE, {
@@ -153,44 +168,55 @@ PapertrailLogHandler papertrailHandler(papertrailAddress, papertrailPort,
   // TOO MUCH!!! { “comm”, LOG_LEVEL_ALL }
 });
 
+SYSTEM_THREAD(ENABLED)
+
+void startupMacro() {
+    WiFi.selectAntenna(ANT_EXTERNAL);
+    System.enableFeature(FEATURE_RESET_INFO);
+    System.enableFeature(FEATURE_RETAINED_MEMORY);
+}
+STARTUP(startupMacro());
+
 void setup() {
-  pinMode(A0, OUTPUT);
-  pinMode(A1, OUTPUT);
-  pinMode(A2, OUTPUT);
-  light.loadSettings();
-  light.setup();
+    pinMode(A0, OUTPUT);
+    pinMode(A1, OUTPUT);
+    pinMode(A2, OUTPUT);
+    light.loadSettings();
+    light.setup();
 
-  Particle.variable("resetTime", resetTime);
-  Particle.publishVitals(900);
+    Particle.variable("resetTime", resetTime);
+    Particle.publishVitals(900);
 
-  waitFor(Particle.connected, 30000);
+    waitFor(Particle.connected, 30000);
+    
+    do {
+        resetTime = Time.now();
+        Particle.process();
+    } while (resetTime < 1500000000 || millis() < 10000);
+    
+    if (System.resetReason() == RESET_REASON_PANIC) {
+        if ((Time.now() - lastHardResetTime) < 120) {
+            resetCount++;
+        } else {
+            resetCount = 1;
+        }
 
-  do {
-    resetTime = Time.now();
-    Particle.process();
-  } while (resetTime < 1500000000 || millis() < 10000);
+        lastHardResetTime = Time.now();
 
-  if (System.resetReason() == RESET_REASON_PANIC) {
-    if ((Time.now() - lastHardResetTime) < 120) {
-      resetCount++;
+        if (resetCount > 3) {
+            System.enterSafeMode();
+        }
+    } else if (System.resetReason() == RESET_REASON_WATCHDOG) {
+      Log.info("RESET BY WATCHDOG");
     } else {
-      resetCount = 1;
+        resetCount = 0;
     }
 
-    lastHardResetTime = Time.now();
+    Udp.begin(udpLocalPort);
 
-    if (resetCount > 3) {
-      System.enterSafeMode();
-    }
-  } else {
-    resetCount = 0;
-  }
+    Log.info("Boot complete. Reset count = %d", resetCount);
 
-  Udp.begin(udpLocalPort);
-
-  Log.info("Boot complete. Reset count = %d", resetCount);
-
-  connectToMQTT();
+    connectToMQTT();
 }
 
 void loop() {
@@ -204,6 +230,7 @@ void loop() {
   
   if (mqttClient.isConnected()) {
     mqttClient.loop();
+    sendTelegrafMetrics();
   } else if ((mqttConnectionAttempts < 5 && millis() > (lastMqttConnectAttempt + mqttConnectAttemptTimeout1)) ||
               millis() > (lastMqttConnectAttempt + mqttConnectAttemptTimeout2)) {
     connectToMQTT();
