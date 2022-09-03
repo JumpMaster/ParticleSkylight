@@ -109,7 +109,7 @@ void sendTelegrafMetrics() {
 
         char buffer[150];
         snprintf(buffer, sizeof(buffer),
-            "status,device=Skylight uptime=%d,resetReason=%d,firmware=\"%s\",memTotal=%ld,memFree=%ld,ipv4=\"%s\"",
+            "status,device=Skylight uptime=%d,resetReason=%d,firmware=\"%s\",memTotal=%ld,memUsed=%ld,ipv4=\"%s\"",
             System.uptime(),
             System.resetReason(),
             System.version().c_str(),
@@ -229,14 +229,17 @@ void loop() {
     publishColor();
   }
   
-  if (mqttClient.isConnected()) {
+  if (mqttClient.isConnected())
+  {
     mqttClient.loop();
     sendTelegrafMetrics();
-  } else if ((mqttConnectionAttempts < 5 && millis() > (lastMqttConnectAttempt + mqttConnectAttemptTimeout1)) ||
-              millis() > (lastMqttConnectAttempt + mqttConnectAttemptTimeout2)) {
+  }
+  else if ((mqttConnectionAttempts < 5 && millis() > (lastMqttConnectAttempt + mqttConnectAttemptTimeout1)) ||
+              millis() > (lastMqttConnectAttempt + mqttConnectAttemptTimeout2))
+  {
     connectToMQTT();
   }
-
+/*
   if (Udp.parsePacket() > 0) {
 
     // Read first char of data received
@@ -250,4 +253,5 @@ void loop() {
       light.setBrightness((b+1) * 25.5);
     }
   } 
+*/
 }

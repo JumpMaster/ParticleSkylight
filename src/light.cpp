@@ -2,6 +2,7 @@
 
 void Light::setup() {
   FastLED.addLeds<WS2812, LED_PIN, GRB>(leds, LED_COUNT);
+  FastLED.clear();
   FastLED.setBrightness(0);
   FastLED.show();
 }
